@@ -302,15 +302,19 @@ def main():
         period = int(args.period)
 
 
-    d3 = D3()
-    if args.uid and args.sid:        
-        d3.session_init(sid=args.sid, uid=args.uid)
-    else:
-        d3.auth(args.user, args.password)
-        print(d3)
+    try:
+        d3 = D3()
+        if args.uid and args.sid:        
+            d3.session_init(sid=args.sid, uid=args.uid)
+        else:
+            d3.auth(args.user, args.password)
+            print(d3)
 
-    me = d3.me()
-    print(f"Working as user: {me['login']} #{me['id']}")
+        me = d3.me()
+        print(f"Working as user: {me['login']} #{me['id']}")
+    except d3exc as e:
+        print("authentication failed:", e)
+        return
 
     print("Started:", datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
     started = time.time()
