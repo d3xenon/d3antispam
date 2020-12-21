@@ -187,15 +187,14 @@ Posts = [Post]
 
 
 def get_args():
-    parser = argparse.ArgumentParser(description = 'd3 antispam checked')
+    parser = argparse.ArgumentParser(description = 'd3 antispam')
     parser.add_argument('--size', type=int, default=20, help='page size (number of posts in page)')
     parser.add_argument('--period', default='1h', help='period (e.g. 12h or 2d)')
 
     group = parser.add_argument_group('Authentication')
     group.add_argument('--user', '-u', help='your username', default = os.getenv('D3USER'))
     group.add_argument('--password', '-p', help='your password', default=os.getenv('D3PASS'))
-
-    group = parser.add_argument_group('Authentication (debug)')
+    group.add_argument('--me', default=False, action='store_true', help='Show info about me and exit')
     group.add_argument('--uid', help='uid', default = os.getenv('D3UID'))
     group.add_argument('--sid', help='session id', default=os.getenv('D3SID'))
 
@@ -301,10 +300,10 @@ def main():
     else:
         period = int(args.period)
 
-
     try:
         d3 = D3()
-        if args.uid and args.sid:        
+        if args.uid and args.sid:
+            print(f'Re-using session {args.sid}')        
             d3.session_init(sid=args.sid, uid=args.uid)
         else:
             d3.auth(args.user, args.password)
@@ -314,6 +313,10 @@ def main():
         print(f"Working as user: {me['login']} #{me['id']}")
     except d3exc as e:
         print("authentication failed:", e)
+        return
+
+    if args.me:
+        print(json.dumps(me, indent=4))
         return
 
     print("Started:", datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
@@ -330,7 +333,7 @@ def main():
             if not post.username in users:
                 users.append(post.username)
 
-    print(f'Checked {checked} posts ({checked_minus} negative) found {len(users)} users to check')
+    print(f'Checked {checked} posts for last {args.period} ({checked_minus} negative) found {len(users)} users to check')
 
 
     for user in users:
