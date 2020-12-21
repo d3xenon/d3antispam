@@ -72,7 +72,15 @@ class D3():
             r = requests.get(req.url)
             data = r.json()
             for pdata in data['posts']:
-                p = Post(pdata, client=self)
+                try:
+                    p = Post(pdata, client=self)
+                except:
+                    print("Failed to create posts structure")
+                    print("DATA:", json.dumps(data, indent=4))
+                    print("code:", r.status_code)
+                    print("text:", r.text)
+                    print("r:", r)
+
                 if p.age() < period:
                     reported += 1
                     yield p
@@ -99,6 +107,10 @@ class D3():
             raise d3exc(f'{method} {url} {r.status_code} {r.text}')
         return r
 
+    def me(self):
+        r = self.authrequest('GET','https://d3.ru/api/my')
+        return r.json()
+
 class Comment():
     def __init__(self, post, data):
         self.data = data
@@ -112,7 +124,21 @@ class Comment():
 
 
 class Post():
-    def __init__(self, data, client=None):
+    def __init__(self, data=None, post_id=None, client=None):
+
+        self.client = client 
+
+        if post_id:
+            url = f'https://d3.ru/api/posts/{post_id}/'
+
+            if client:
+                r = client.authrequest('GET', url)
+            else:
+                r = requests.get(url)            
+                if r.status_code != 200:
+                    raise d3exc(f'GET {url} {r.status_code} {r.text}')
+            data = r.json()
+
         self.data = data
         self.id = data['id']
         self.username = data['user']['login']
@@ -122,7 +148,6 @@ class Post():
         self.created = data['created']
         self.karma = data['user']['karma']
 
-        self.client = client
     
 
     def __repr__(self):
@@ -147,6 +172,14 @@ class Post():
         data = {'body': body}
         return self.client.authrequest('POST', url, data)
 
+    def unpublish(self):
+        r = self.client.authrequest('POST',f'https://d3.ru/api/posts/{self.id}/unpublish/')
+
+    def getattr(self, name):
+        return self.data[name]
+
+    def can_unpublish(self):
+        return self.getattr('can_unpublish')
         
 
 Posts = [Post]
@@ -172,7 +205,8 @@ def get_args():
 
     group = parser.add_argument_group('Spam reaction')
     group.add_argument('--body', default=None, help='specify body to comment each punished post')
-
+    group.add_argument('--minus', default=False, action='store_true', help='Vote (-1) for spam post')
+    group.add_argument('--unpublish', default=False, action='store_true', help='Unpublish post (if possible)')
 
     return parser.parse_args()
 
@@ -223,29 +257,34 @@ def is_spammer(d3: D3, user: str, period: int, posts: int, neg: int):
         return True
     return False
 
-def punish(d3: D3, user: str, body: str, period: int):
+def punish(d3: D3, user: str, body: str, minus: bool, unpublish: bool, period: int):
     for post in d3.last_posts(period=period, user=user):
             print("PUNISH", post)
             # VOTE
-            try:
-                post.vote(-1)
-            except d3exc as e:
-                pass
-
-            commented = False
-            # COMMENTED? (unreliable!)
-            for comment in post.get_comments():
-                if comment.uid == d3.uid:
-                    commented = True
-                    break
-                    
-                    
-            if not commented:
-                try:
-                    post.comment(body)
+            if minus:
+                try:                
+                    post.vote(-1)
                 except d3exc as e:
                     pass
-                    # print("comment failed:", e)
+
+            if body:
+                commented = False
+                # COMMENTED? (unreliable!)
+                for comment in post.get_comments():
+                    if comment.uid == d3.uid:
+                        commented = True
+                        break
+                                            
+                if not commented:
+                    try:
+                        post.comment(body)
+                    except d3exc as e:
+                        pass
+                        # print("comment failed:", e)
+            
+            if unpublish:
+                print(f'unpublish #{post.id}')
+                post.unpublish()
 
 # main
 def main():
@@ -261,7 +300,7 @@ def main():
         period = int(args.period[:-1])
     else:
         period = int(args.period)
-    
+
 
     d3 = D3()
     if args.uid and args.sid:        
@@ -269,6 +308,9 @@ def main():
     else:
         d3.auth(args.user, args.password)
         print(d3)
+
+    me = d3.me()
+    print(f"Working as user: {me['login']} #{me['id']}")
 
     print("Started:", datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
     started = time.time()
@@ -282,7 +324,9 @@ def main():
     for user in users:
         if is_spammer(d3, user, period=period, posts=args.posts, neg=args.neg):
             punish(d3, user, 
-                body=args.body, 
+                body=args.body,
+                minus=args.minus,
+                unpublish=args.unpublish, 
                 period=period)
             return
 
