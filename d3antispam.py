@@ -319,11 +319,19 @@ def main():
     print("Started:", datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
     started = time.time()
 
+
+    checked = 0
+    checked_minus = 0
     for post in d3.last_posts(period=period):
         # print(post)
+        checked += 1
         if post.rating<0:
+            checked_minus += 1
             if not post.username in users:
                 users.append(post.username)
+
+    print(f'Checked {checked} posts ({checked_minus} negative) found {len(users)} users to check')
+
 
     for user in users:
         if is_spammer(d3, user, period=period, posts=args.posts, neg=args.neg):
