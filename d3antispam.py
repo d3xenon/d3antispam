@@ -74,9 +74,9 @@ class D3():
             for pdata in data['posts']:
                 try:
                     p = Post(pdata, client=self)
-                except:
-                    print("Failed to create posts structure")
-                    print("DATA:", json.dumps(data, indent=4))
+                except Exception as e:
+                    print("Failed to create posts structure:", e)
+                    print("DATA:", json.dumps(pdata, indent=4))
                     print("code:", r.status_code)
                     print("text:", r.text)
                     print("r:", r)
